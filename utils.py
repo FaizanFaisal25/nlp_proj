@@ -5,7 +5,8 @@ import logging
 import torch
 import numpy as np
 
-from sklearn.metrics import precision_recall_fscore_support, accuracy_score
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score, confusion_matrix, ConfusionMatrixDisplay, multilabel_confusion_matrix
+import matplotlib.pyplot as plt
 
 
 def init_logger():
@@ -22,9 +23,25 @@ def set_seed(args):
         torch.cuda.manual_seed_all(args.seed)
 
 
-def compute_metrics(labels, preds):
+def compute_metrics(labels, preds, output_matrix, label_list):
     assert len(preds) == len(labels)
     results = dict()
+
+    print("CONFUSION MATRIX")
+    cm = multilabel_confusion_matrix(labels, preds)
+    fig, ax = plt.subplots(4, 7, figsize=(100, 50))
+    for i in range(4):
+        for j in range(7):
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm[i*7+j], display_labels=["Not " + label_list[i*7+j], label_list[i*7+j]])
+            disp.plot(ax=ax[i, j], values_format='d')
+    plt.savefig(output_matrix+"_all"+".png")
+
+    main_cm = np.zeros((2, 2))
+    for i in range(len(cm)):
+        main_cm += cm[i]
+    disp = ConfusionMatrixDisplay(confusion_matrix=main_cm, display_labels=["yes", "no"])
+    disp.plot()
+    plt.savefig(output_matrix+"_main"+".png")
 
     results["accuracy"] = accuracy_score(labels, preds)
     results["macro_precision"], results["macro_recall"], results[

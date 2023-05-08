@@ -36,7 +36,8 @@ def train(args,
           tokenizer,
           train_dataset,
           dev_dataset=None,
-          test_dataset=None):
+          test_dataset=None,
+          label_list=None):
     train_sampler = RandomSampler(train_dataset)
     train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
     if args.max_steps > 0:
@@ -114,9 +115,9 @@ def train(args,
 
                 if args.logging_steps > 0 and global_step % args.logging_steps == 0:
                     if args.evaluate_test_during_training:
-                        evaluate(args, model, test_dataset, "test", global_step)
+                        evaluate(args, model, test_dataset, "test", global_step, label_list)
                     else:
-                        evaluate(args, model, dev_dataset, "dev", global_step)
+                        evaluate(args, model, dev_dataset, "dev", global_step, label_list)
 
                 if args.save_steps > 0 and global_step % args.save_steps == 0:
                     # Save model checkpoint
@@ -146,7 +147,7 @@ def train(args,
     return global_step, tr_loss / global_step
 
 
-def evaluate(args, model, eval_dataset, mode, global_step=None):
+def evaluate(args, model, eval_dataset, mode, global_step=None, label_list=None):
     results = {}
     eval_sampler = SequentialSampler(eval_dataset)
     eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
@@ -190,14 +191,17 @@ def evaluate(args, model, eval_dataset, mode, global_step=None):
     results = {
         "loss": eval_loss
     }
-    preds[preds > args.threshold] = 1
-    preds[preds <= args.threshold] = 0
-    result = compute_metrics(out_label_ids, preds)
-    results.update(result)
 
     output_dir = os.path.join(args.output_dir, mode)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+    
+    preds[preds > args.threshold] = 1
+    preds[preds <= args.threshold] = 0
+    output_matrix = os.path.join(output_dir, "{}-{}".format(mode, global_step) if global_step else "{}".format(mode))
+    result = compute_metrics(out_label_ids, preds, output_matrix, label_list)
+    results.update(result)
+
 
     output_eval_file = os.path.join(output_dir, "{}-{}.txt".format(mode, global_step) if global_step else "{}.txt".format(mode))
     with open(output_eval_file, "w") as f_w:
@@ -252,7 +256,7 @@ def main(cli_args):
         args.evaluate_test_during_training = True  # If there is no dev dataset, only use test dataset
 
     if args.do_train:
-        global_step, tr_loss = train(args, model, tokenizer, train_dataset, dev_dataset, test_dataset)
+        global_step, tr_loss = train(args, model, tokenizer, train_dataset, dev_dataset, test_dataset, label_list)
         logger.info(" global_step = {}, average loss = {}".format(global_step, tr_loss))
 
     results = {}
@@ -270,7 +274,7 @@ def main(cli_args):
             global_step = checkpoint.split("-")[-1]
             model = BertForMultiLabelClassification.from_pretrained(checkpoint)
             model.to(args.device)
-            result = evaluate(args, model, test_dataset, mode="test", global_step=global_step)
+            result = evaluate(args, model, test_dataset, mode="test", global_step=global_step, label_list=label_list)
             result = dict((k + "_{}".format(global_step), v) for k, v in result.items())
             results.update(result)
 

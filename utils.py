@@ -32,7 +32,7 @@ def compute_metrics(labels, preds, output_matrix, label_list):
     fig, ax = plt.subplots(4, 7, figsize=(100, 50))
     for i in range(4):
         for j in range(7):
-            disp = ConfusionMatrixDisplay(confusion_matrix=cm[i*7+j], display_labels=["Not " + label_list[i*7+j], label_list[i*7+j]])
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm[i*7+j], display_labels=[label_list[i*7+j], "Not " + label_list[i*7+j]])
             disp.plot(ax=ax[i, j], values_format='d')
     plt.savefig(output_matrix+"_all"+".png")
 
